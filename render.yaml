@@ -1,9 +1,11 @@
 services:
   - type: web
-    name: notepad-bot
+    name: notepad-telegram-bot
     env: python
+    plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: python bot.py
     envVars:
       - key: BOT_TOKEN
         fromSecret: BOT_TOKEN
+    autoDeploy: true
