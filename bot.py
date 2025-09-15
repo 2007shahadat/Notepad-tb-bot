@@ -2,9 +2,13 @@ import os
 import logging
 import json
 from datetime import datetime
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Message
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes, MessageHandler, filters
 from telegram.constants import ParseMode
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Enable logging
 logging.basicConfig(
@@ -18,22 +22,24 @@ BOT_TOKEN = os.getenv('BOT_TOKEN')
 if not BOT_TOKEN:
     raise ValueError("Please set BOT_TOKEN environment variable")
 
-# Dictionary to store user data (in memory, for demo purposes)
-# In production, you might want to use a simple file-based storage
+# Dictionary to store user data
 user_notes = {}
 user_settings = {}
 
 def save_user_data():
-    """Save user data to a file (optional)"""
-    data = {
-        'notes': user_notes,
-        'settings': user_settings
-    }
-    with open('user_data.json', 'w') as f:
-        json.dump(data, f)
+    """Save user data to a file"""
+    try:
+        data = {
+            'notes': user_notes,
+            'settings': user_settings
+        }
+        with open('user_data.json', 'w') as f:
+            json.dump(data, f)
+    except Exception as e:
+        logger.error(f"Error saving user data: {e}")
 
 def load_user_data():
-    """Load user data from file (optional)"""
+    """Load user data from file"""
     global user_notes, user_settings
     try:
         with open('user_data.json', 'r') as f:
@@ -41,6 +47,10 @@ def load_user_data():
             user_notes = data.get('notes', {})
             user_settings = data.get('settings', {})
     except FileNotFoundError:
+        user_notes = {}
+        user_settings = {}
+    except Exception as e:
+        logger.error(f"Error loading user data: {e}")
         user_notes = {}
         user_settings = {}
 
@@ -51,14 +61,13 @@ def get_user_notes(user_id):
     """Get all notes for a user"""
     return user_notes.get(str(user_id), [])
 
-def add_user_note(user_id, message_id, title, content, category='General'):
+def add_user_note(user_id, title, content, category='General'):
     """Add a new note for user"""
     user_id_str = str(user_id)
     if user_id_str not in user_notes:
         user_notes[user_id_str] = []
     
     note = {
-        'message_id': message_id,
         'title': title,
         'content': content,
         'category': category,
@@ -137,6 +146,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 /search - Search notes
 /categories - Manage categories
 /help - Show help guide
+/stats - Show statistics
+/clear - Clear all notes
 
 Simply send me any text to save it as a note! 🚀
 """
@@ -146,6 +157,7 @@ Simply send me any text to save it as a note! 🚀
         [InlineKeyboardButton("📋 My Notes", callback_data='view_notes')],
         [InlineKeyboardButton("🔍 Search Notes", callback_data='search_notes')],
         [InlineKeyboardButton("🗂️ Categories", callback_data='view_categories')],
+        [InlineKeyboardButton("📊 Statistics", callback_data='stats')],
         [InlineKeyboardButton("❓ Help Guide", callback_data='help')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -185,12 +197,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # Auto-generate title from first few words
             title = content[:30] + '...' if len(content) > 30 else content
         
-        # Save the message and get its ID
-        sent_message = await update.message.reply_text("💾 Saving your note...")
-        message_id = sent_message.message_id
-        
         # Save to user data
-        note_id = add_user_note(user_id, message_id, title, content)
+        note_id = add_user_note(user_id, title, content)
         
         keyboard = [
             [InlineKeyboardButton("📋 View All Notes", callback_data='view_notes')],
@@ -199,8 +207,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        # Edit the original message to show success
-        await sent_message.edit_text(
+        await update.message.reply_text(
             f"✅ *Note saved successfully!*\n\n"
             f"📌 *Title:* {title}\n"
             f"📄 *Content:* {content[:100]}{'...' if len(content) > 100 else ''}\n\n"
@@ -222,7 +229,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         message = f"🔍 *Search Results for '{query}':*\n\n"
         keyboard = []
         
-        for note in results[:10]:  # Limit to 10 results
+        for note in results[:10]:
             message += f"📌 #{note['note_id']}: {note['title']}\nCategory: {note['category']}\n\n"
             keyboard.append([InlineKeyboardButton(f"📄 #{note['note_id']}: {note['title'][:20]}...", callback_data=f'view_note_{note["note_id"]}')])
         
@@ -244,7 +251,7 @@ async def my_notes(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = "📋 *Your Notes:*\n\n"
     keyboard = []
     
-    for note in notes[:10]:  # Show last 10 notes
+    for note in notes[:10]:
         message += f"#{note['note_id']}: {note['title']} ({note['category']})\n"
         keyboard.append([
             InlineKeyboardButton(f"📄 #{note['note_id']}", callback_data=f'view_note_{note["note_id"]}'),
@@ -391,6 +398,26 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await query.edit_message_text("❌ Note not found or already deleted.")
     
+    elif data == 'stats':
+        notes = get_user_notes(user_id)
+        categories = get_user_categories(user_id)
+        
+        total_notes = len(notes)
+        total_categories = len(categories)
+        
+        stats_text = f"""
+📊 *Your Statistics*
+
+📝 Total Notes: {total_notes}
+🗂️ Categories: {total_categories}
+📅 Last Updated: {datetime.now().strftime('%Y-%m-%d %H:%M')}
+
+Keep adding notes to build your knowledge base! 🚀
+"""
+        keyboard = [[InlineKeyboardButton("🔙 Main Menu", callback_data='back_to_main')]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(stats_text, parse_mode=ParseMode.MARKDOWN, reply_markup=reply_markup)
+    
     elif data == 'help':
         help_text = """
 🤖 *Notepad++ Bot Help Guide*
@@ -401,6 +428,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 /mynotes - View your notes
 /search - Search through notes
 /categories - View categories
+/stats - Show statistics
+/clear - Clear all notes
 /help - Show this help
 
 *How to use:*
@@ -408,13 +437,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 2. Use format: *Title:* Your Title\\n*Content:* Your content
 3. Or just send content for auto-title
 4. Use buttons to navigate easily
-
-*Features:*
-• 📝 Note taking with titles
-• 🗂️ Category organization
-• 🔍 Full-text search
-• ⚡ Quick inline buttons
-• 💾 Telegram message storage
 
 📝 *Happy note-taking!*
 """
@@ -431,6 +453,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("📋 My Notes", callback_data='view_notes')],
             [InlineKeyboardButton("🔍 Search Notes", callback_data='search_notes')],
             [InlineKeyboardButton("🗂️ Categories", callback_data='view_categories')],
+            [InlineKeyboardButton("📊 Statistics", callback_data='stats')],
             [InlineKeyboardButton("❓ Help Guide", callback_data='help')]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -447,6 +470,8 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 /mynotes - View your notes
 /search - Search notes
 /categories - View categories
+/stats - Show statistics
+/clear - Clear all notes
 /help - Show help
 
 Simply send any text message to save it as a note! Use the inline buttons for easy navigation.
@@ -467,7 +492,7 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 📝 Total Notes: {total_notes}
 🗂️ Categories: {total_categories}
-📅 Account Created: {datetime.now().strftime('%Y-%m-%d')}
+📅 Last Updated: {datetime.now().strftime('%Y-%m-%d %H:%M')}
 
 Keep adding notes to build your knowledge base! 🚀
 """
@@ -478,8 +503,8 @@ async def clear_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     user_id_str = str(user_id)
     
-    if user_id_str in user_notes:
-        del user_notes[user_id_str]
+    if user_id_str in user_notes and user_notes[user_id_str]:
+        user_notes[user_id_str] = []
         save_user_data()
         await update.message.reply_text("✅ All your notes have been cleared!")
     else:
@@ -504,7 +529,7 @@ def main():
 
     # Start the Bot
     print("🤖 Notepad++ Bot is running...")
-    print("💾 Using Telegram message storage")
+    print("💾 Using JSON file storage")
     print("🚀 Ready to receive messages!")
     
     application.run_polling(allowed_updates=Update.ALL_TYPES)
