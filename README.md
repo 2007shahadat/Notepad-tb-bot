@@ -128,9 +128,13 @@ Title: Important Meeting Notes
 Content: Discussed project timeline and assigned tasks.
 
 <p align="center">
-  <img src="https://via.placeholder.com/400x300/2CA5E0/ffffff?text=Inline+Keyboard+Interface" alt="UI Preview" width="400" />
-  <br>
-  <em>Beautiful inline keyboard interface</em>
+  <a href="https://t.me/NotePadPro_BOT" target="_blank">
+    <img src="https://img.shields.io/badge/UI%20Preview-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white" alt="UI Preview" />
+  </a>
+</p>
+
+<p align="center">
+  <em style="font-size: 16px; color: gray;">✨ Beautiful inline keyboard interface ✨</em>
 </p>
 
 ---
