@@ -17,9 +17,13 @@
 ---
 
 <p align="center">
-  Notepad Bot Demo 
-  <br>
-  <em>A powerful note-taking solution directly inside Telegram</em>
+  <a href="https://t.me/Developer_x_app" target="_blank">
+    <img src="https://img.shields.io/badge/Notepad%20Bot-Demo-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white" alt="Notepad Bot Demo" />
+  </a>
+</p>
+
+<p align="center">
+  <em style="font-size: 16px; color: gray;">📝 A powerful note-taking solution directly inside Telegram</em>
 </p>
 ---
 
