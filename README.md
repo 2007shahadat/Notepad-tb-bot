@@ -132,10 +132,12 @@ Content: Discussed project timeline and assigned tasks.
   <br>
   <em>Beautiful inline keyboard interface</em>
 </p>
+
 ---
 
 🏗️ Architecture
 
+```mermaid
 graph TD
     A[Telegram User] --> B[Telegram API]
     B --> C[Notepad Bot]
@@ -146,9 +148,10 @@ graph TD
     E --> H[Data Storage]
     F --> H
     G --> H
-
+```
 
 ---
+
 
 🌐 Deployment
 
