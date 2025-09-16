@@ -15,24 +15,22 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
-logger = logging.getLogger(__name__) # Corrected 'name' to '__name__' for standard practice
+logger = logging.getLogger(__name__)
 
 # Get bot token from environment variable
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 if not BOT_TOKEN:
-    # If BOT_TOKEN is not set, raise an error to prevent the bot from starting
     raise ValueError("Please set BOT_TOKEN environment variable in your .env file or environment.")
 
 # --- Global Data Storage and Persistence ---
 user_data = {
-    'notes': {},    # Stores notes: {user_id_str: [{note_obj}, ...]}
-    'settings': {}  # Stores user-specific settings: {user_id_str: {'next_note_id': int}}
+    'notes': {},
+    'settings': {}
 }
 
-DATA_FILE = 'user_data.json' # The file used for storing all bot data
+DATA_FILE = 'user_data.json'
 
 def save_user_data():
-    """Save all user data (notes and settings) to the DATA_FILE."""
     try:
         with open(DATA_FILE, 'w', encoding='utf-8') as f:
             json.dump(user_data, f, ensure_ascii=False, indent=4)
@@ -41,8 +39,7 @@ def save_user_data():
         logger.error(f"Error saving user data: {e}")
 
 def load_user_data():
-    """Load all user data (notes and settings) from the DATA_FILE."""
-    global user_data # Declare intent to modify the global user_data variable
+    global user_data
     try:
         if os.path.exists(DATA_FILE):
             with open(DATA_FILE, 'r', encoding='utf-8') as f:
@@ -50,23 +47,21 @@ def load_user_data():
             logger.info("User data loaded successfully.")
         else:
             logger.info(f"User data file '{DATA_FILE}' not found, starting with empty data.")
-            user_data = {'notes': {}, 'settings': {}} # Initialize if file doesn't exist
+            user_data = {'notes': {}, 'settings': {}}
     except json.JSONDecodeError as e:
         logger.error(f"Error decoding JSON from user data file: {e}. Starting with empty data.")
-        user_data = {'notes': {}, 'settings': {}} # Fallback to empty data on corruption
+        user_data = {'notes': {}, 'settings': {}}
     except Exception as e:
         logger.error(f"Error loading user data: {e}. Starting with empty data.")
-        user_data = {'notes': {}, 'settings': {}} # Fallback on other errors
+        user_data = {'notes': {}, 'settings': {}}
 
-# Load existing data when the bot starts
 load_user_data()
 
 # --- Helper functions for note management ---
 
-NOTES_PER_PAGE = 5 # Define how many notes to show per page for pagination
+NOTES_PER_PAGE = 5
 
 def get_user_notes(user_id):
-    """Get all notes for a specific user, sorted by creation date (newest first)."""
     return sorted(
         user_data['notes'].get(str(user_id), []),
         key=lambda x: datetime.fromisoformat(x['created_at']),
@@ -74,7 +69,6 @@ def get_user_notes(user_id):
     )
 
 def add_user_note(user_id, title, content, category='General'):
-    """Add a new note for a user with a unique incrementing ID."""
     user_id_str = str(user_id)
 
     if user_id_str not in user_data['notes']:
@@ -99,7 +93,6 @@ def add_user_note(user_id, title, content, category='General'):
     return note['note_id']
 
 def delete_user_note(user_id, note_id):
-    """Delete a specific note by its ID for a given user."""
     user_id_str = str(user_id)
     if user_id_str in user_data['notes']:
         initial_len = len(user_data['notes'][user_id_str])
@@ -110,7 +103,6 @@ def delete_user_note(user_id, note_id):
     return False
 
 def get_user_note(user_id, note_id):
-    """Retrieve a specific note by its ID for a given user."""
     user_id_str = str(user_id)
     if user_id_str in user_data['notes']:
         for note in user_data['notes'][user_id_str]:
@@ -119,7 +111,6 @@ def get_user_note(user_id, note_id):
     return None
 
 def update_user_note_category(user_id, note_id, new_category):
-    """Update the category of an existing note."""
     user_id_str = str(user_id)
     if user_id_str in user_data['notes']:
         for note in user_data['notes'][user_id_str]:
@@ -130,7 +121,6 @@ def update_user_note_category(user_id, note_id, new_category):
     return False
 
 def search_user_notes(user_id, query):
-    """Search notes for a user by matching query in title, content, or category (case-insensitive)."""
     user_id_str = str(user_id)
     if user_id_str not in user_data['notes']:
         return []
@@ -146,7 +136,6 @@ def search_user_notes(user_id, query):
     return sorted(results, key=lambda x: datetime.fromisoformat(x['created_at']), reverse=True)
 
 def get_user_categories(user_id):
-    """Get all unique categories associated with a user's notes, sorted alphabetically."""
     user_id_str = str(user_id)
     if user_id_str not in user_data['notes']:
         return []
@@ -159,11 +148,9 @@ def get_user_categories(user_id):
 
 # --- Bot handlers ---
 
-# Define a constant for the 'Back to Main Menu' button for reusability
 BACK_TO_MAIN_MENU_BUTTON = InlineKeyboardButton("🔙 Main Menu", callback_data='back_to_main')
 
 def get_main_keyboard():
-    """Returns the main inline keyboard markup for bot navigation."""
     keyboard = [
         [InlineKeyboardButton("➕ New Note", callback_data='new_note')],
         [InlineKeyboardButton("📋 My Notes", callback_data='view_notes_page_0')],
@@ -175,7 +162,6 @@ def get_main_keyboard():
     return InlineKeyboardMarkup(keyboard)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handles the /start command, sending a welcome message and the main menu."""
     user = update.effective_user
     welcome_text = f"""
 👋 Hello {user.first_name}! Welcome to *Notepad++ Bot*! 📝
@@ -204,7 +190,6 @@ Simply send me any text to save it as a quick note! 🚀
     await update.message.reply_text(welcome_text, parse_mode=ParseMode.MARKDOWN, reply_markup=get_main_keyboard())
 
 async def new_note(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Initiates the process for creating a new note."""
     context.user_data['awaiting_note'] = True
     context.user_data.pop('awaiting_search', None)
     context.user_data.pop('awaiting_category_for_note_id', None)
@@ -221,7 +206,6 @@ async def new_note(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handles incoming text messages based on the current user state (e.g., new note, search query, category update)."""
     user_id = update.effective_user.id
     text = update.message.text
 
@@ -235,7 +219,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 [InlineKeyboardButton("📄 View Note", callback_data=f'view_note_{note_id}')],
                 [InlineKeyboardButton("📋 My Notes", callback_data='view_notes_page_0')],
                 [InlineKeyboardButton("➕ New Note", callback_data='new_note')],
-                [BACK_TO_MAIN_MENU_BUTTON] # Added Back button
+                [BACK_TO_MAIN_MENU_BUTTON]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             await update.message.reply_text(
@@ -288,7 +272,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("📋 View All Notes", callback_data='view_notes_page_0')],
             [InlineKeyboardButton("➕ Another Note", callback_data='new_note')],
             [InlineKeyboardButton("📄 View This Note", callback_data=f'view_note_{note_id}')],
-            [BACK_TO_MAIN_MENU_BUTTON] # Added Back button
+            [BACK_TO_MAIN_MENU_BUTTON]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -325,7 +309,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("📋 View All Notes", callback_data='view_notes_page_0')],
             [InlineKeyboardButton("➕ Another Note", callback_data='new_note')],
             [InlineKeyboardButton("📄 View This Note", callback_data=f'view_note_{note_id}')],
-            [BACK_TO_MAIN_MENU_BUTTON] # Added Back button
+            [BACK_TO_MAIN_MENU_BUTTON]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -341,7 +325,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def send_notes_page(target_message, context, page: int, category: str = None):
-    """Helper function to send a paginated list of notes (either via command or callback)."""
     user_id = target_message.chat.id
     all_notes = get_user_notes(user_id)
 
@@ -351,7 +334,6 @@ async def send_notes_page(target_message, context, page: int, category: str = No
     if not all_notes:
         text = f"📭 You don't have any notes yet {'in the category *'+category+'*' if category else ''}. Use /new to create one!"
         reply_func = target_message.reply_text if target_message.from_user else target_message.edit_message_text
-        # Ensure the main keyboard is always available if no notes are found
         await reply_func(text, parse_mode=ParseMode.MARKDOWN, reply_markup=get_main_keyboard())
         return
 
@@ -383,7 +365,7 @@ async def send_notes_page(target_message, context, page: int, category: str = No
         [InlineKeyboardButton("🔍 Search Notes", callback_data='search_notes')],
         [InlineKeyboardButton("🗂️ View Categories", callback_data='view_categories')],
         [InlineKeyboardButton("➕ New Note", callback_data='new_note')],
-        [BACK_TO_MAIN_MENU_BUTTON] # Added Back button
+        [BACK_TO_MAIN_MENU_BUTTON]
     ])
 
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -395,11 +377,9 @@ async def send_notes_page(target_message, context, page: int, category: str = No
         await target_message.edit_message_text(text_to_send, parse_mode=ParseMode.MARKDOWN, reply_markup=reply_markup)
 
 async def my_notes(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handles the /mynotes command to show the first page of user's notes."""
     await send_notes_page(update.message, context, 0)
 
 async def send_search_results_page(target_message, context, query: str, page: int):
-    """Helper function to send a paginated list of search results."""
     user_id = target_message.chat.id
     results = context.user_data.get('last_search_results', [])
     
@@ -434,9 +414,9 @@ async def send_search_results_page(target_message, context, query: str, page: in
         keyboard.append(pagination_buttons)
 
     keyboard.extend([
-        [InlineKeyboardButton("📋 Back to Notes", callback_data='view_notes_page_0')], # This goes back to all notes, not main menu
+        [InlineKeyboardButton("📋 Back to Notes", callback_data='view_notes_page_0')],
         [InlineKeyboardButton("➕ New Note", callback_data='new_note')],
-        [BACK_TO_MAIN_MENU_BUTTON] # Added Back button
+        [BACK_TO_MAIN_MENU_BUTTON]
     ])
     reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -446,7 +426,6 @@ async def send_search_results_page(target_message, context, query: str, page: in
 
 
 async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handles the /search command, prompting the user for a search query."""
     context.user_data['awaiting_search'] = True
     context.user_data.pop('awaiting_note', None)
     context.user_data.pop('awaiting_category_for_note_id', None)
@@ -454,7 +433,6 @@ async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🔍 What would you like to search for in your notes? (Enter keywords, title, content, or category)")
 
 async def categories_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handles the /categories command, showing all unique categories and options to view notes within them."""
     user_id = update.effective_user.id
     categories = get_user_categories(user_id)
 
@@ -465,7 +443,7 @@ async def categories_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
         text = "🗂️ You don't have any categories yet. Notes will be saved under 'General' or 'Quick Notes' by default."
         reply_markup = InlineKeyboardMarkup([
             [InlineKeyboardButton("➕ New Note", callback_data='new_note')],
-            [BACK_TO_MAIN_MENU_BUTTON] # Added Back button
+            [BACK_TO_MAIN_MENU_BUTTON]
         ])
         await reply_func(text, parse_mode=ParseMode.MARKDOWN, reply_markup=reply_markup)
         return
@@ -479,13 +457,12 @@ async def categories_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     keyboard.append([InlineKeyboardButton("📋 View All Notes", callback_data='view_notes_page_0')])
     keyboard.append([InlineKeyboardButton("➕ New Note", callback_data='new_note')])
-    keyboard.append([BACK_TO_MAIN_MENU_BUTTON]) # Added Back button
+    keyboard.append([BACK_TO_MAIN_MENU_BUTTON])
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await reply_func(message, parse_mode=ParseMode.MARKDOWN, reply_markup=reply_markup)
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handles all inline button presses and routes them to appropriate logic."""
     query = update.callback_query
     await query.answer()
 
@@ -546,7 +523,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 [InlineKeyboardButton("✏️ Edit Category", callback_data=f'edit_category_{note_id}')],
                 [InlineKeyboardButton("❌ Delete This Note", callback_data=f'delete_note_{note_id}')],
                 [InlineKeyboardButton("➕ New Note", callback_data='new_note')],
-                [BACK_TO_MAIN_MENU_BUTTON] # Added Back button
+                [BACK_TO_MAIN_MENU_BUTTON]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -594,7 +571,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             keyboard = [
                 [InlineKeyboardButton("📋 View Notes", callback_data='view_notes_page_0')],
                 [InlineKeyboardButton("➕ New Note", callback_data='new_note')],
-                [BACK_TO_MAIN_MENU_BUTTON] # Added Back button
+                [BACK_TO_MAIN_MENU_BUTTON]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
@@ -622,7 +599,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 Keep adding notes to build your knowledge base! 🚀
 """
-        keyboard = [[BACK_TO_MAIN_MENU_BUTTON]] # Uses the constant
+        keyboard = [[BACK_TO_MAIN_MENU_BUTTON]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(stats_text, parse_mode=ParseMode.MARKDOWN, reply_markup=reply_markup)
 
@@ -655,7 +632,7 @@ Keep adding notes to build your knowledge base! 🚀
 
 📝 Happy note-taking!
 """
-        keyboard = [[BACK_TO_MAIN_MENU_BUTTON]] # Uses the constant
+        keyboard = [[BACK_TO_MAIN_MENU_BUTTON]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(help_text, parse_mode=ParseMode.MARKDOWN, reply_markup=reply_markup)
 
@@ -666,7 +643,6 @@ Keep adding notes to build your knowledge base! 🚀
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handles the /help command."""
     help_text = """
 🤖 *Notepad++ Bot Help*
 
@@ -682,12 +658,11 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 Simply send any text message to save it as a note! Use the inline buttons for easy navigation, including the '🔙 Main Menu' button.
 """
-    keyboard = [[BACK_TO_MAIN_MENU_BUTTON]] # Added for command handler too
+    keyboard = [[BACK_TO_MAIN_MENU_BUTTON]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(help_text, parse_mode=ParseMode.MARKDOWN, reply_markup=reply_markup)
 
 async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handles the /stats command, showing user's note statistics."""
     user_id = update.effective_user.id
     notes = get_user_notes(user_id)
     categories = get_user_categories(user_id)
@@ -704,12 +679,11 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 Keep adding notes to build your knowledge base! 🚀
 """
-    keyboard = [[BACK_TO_MAIN_MENU_BUTTON]] # Added for command handler too
+    keyboard = [[BACK_TO_MAIN_MENU_BUTTON]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(stats_text, parse_mode=ParseMode.MARKDOWN, reply_markup=reply_markup)
 
 async def clear_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handles the /clear command, deleting all notes for the current user."""
     user_id = update.effective_user.id
     user_id_str = str(user_id)
 
@@ -718,18 +692,20 @@ async def clear_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if user_id_str in user_data['settings']:
             user_data['settings'][user_id_str]['next_note_id'] = 1
         save_user_data()
-        keyboard = [[BACK_TO_MAIN_MENU_BUTTON]] # Added Back button
+        keyboard = [[BACK_TO_MAIN_MENU_BUTTON]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text("✅ All your notes have been cleared!", reply_markup=reply_markup)
     else:
-        keyboard = [[BACK_TO_MAIN_MENU_BUTTON]] # Added Back button
+        keyboard = [[BACK_TO_MAIN_MENU_BUTTON]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text("📭 You don't have any notes to clear.", reply_markup=reply_markup)
 
 def main():
-    """Starts the bot by initializing the Telegram Application and adding all handlers."""
+    """Starts the bot using webhooks for Render deployment."""
+    # Create the Application instance with your bot token
     application = Application.builder().token(BOT_TOKEN).build()
 
+    # Add handlers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("new", new_note))
     application.add_handler(CommandHandler("mynotes", my_notes))
@@ -743,11 +719,38 @@ def main():
     
     application.add_handler(CallbackQueryHandler(button_handler))
 
-    print("🤖 Notepad++ Bot is running...")
-    print(f"💾 Using JSON file storage: {DATA_FILE}")
-    print("🚀 Ready to receive messages!")
+    # --- Webhook Specific Configuration for Render ---
+    PORT = int(os.environ.get('PORT', '8080')) # Render provides a PORT env variable
+    
+    # Render's external URL for your service.
+    # It usually comes from RENDER_EXTERNAL_HOSTNAME or WEB_EXTERNAL_URL
+    # You might need to check your Render service logs or documentation for the exact variable.
+    # A common pattern is your service name followed by render.com, e.g., 'your-bot-name.onrender.com'
+    RENDER_URL = os.environ.get('RENDER_EXTERNAL_HOSTNAME') 
+    
+    if not RENDER_URL:
+        logger.error("RENDER_EXTERNAL_HOSTNAME environment variable not found. Webhooks will not work.")
+        logger.error("Please ensure your Render service is configured correctly or use polling locally.")
+        # Fallback to polling for local testing if RENDER_EXTERNAL_HOSTNAME is not set
+        print("🤖 Notepad++ Bot is running (local polling fallback)...")
+        application.run_polling(allowed_updates=Update.ALL_TYPES)
+        return
 
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
+    WEBHOOK_URL = f"https://{RENDER_URL}/webhook"
+    WEBHOOK_PATH = "/webhook" # The path Telegram will send updates to
+
+    print("🤖 Notepad++ Bot is running (webhook mode)...")
+    print(f"💾 Using JSON file storage: {DATA_FILE}")
+    print(f"🚀 Listening on port {PORT} for webhooks at {WEBHOOK_URL}")
+
+    # Start the Bot using webhooks
+    application.run_webhook(
+        listen="0.0.0.0",
+        port=PORT,
+        url_path=WEBHOOK_PATH,
+        webhook_url=WEBHOOK_URL,
+        secret_token=os.getenv('WEBHOOK_SECRET', 'a_secret_for_webhook_validation') # Optional but good practice
+    )
 
 if __name__ == '__main__':
     main()
